@@ -1,0 +1,14 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+backend/.venv/
+.venv/
+
+# Environment variables / API keys
+backend/.env
+.env

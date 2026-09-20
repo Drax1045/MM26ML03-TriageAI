@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TriageAI — Clinical Intelligence</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Live API layer: defines window.TriageAPI. Must load before the app script. -->
+<script src="triage-live.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --bg:#f7f8fa;
+    --surface:#ffffff;
+    --surface-2:#fbfcfd;
+    --line:#e6e9ee;
+    --line-soft:#f0f2f6;
+
+    --ink:#0b1524;
+    --ink-2:#475569;
+    --ink-3:#8a97a8;
+
+    --navy:#111c2e;
+    --accent:#2563eb;
+    --accent-soft:#eff5ff;
+    --accent-line:#d5e3fd;
+
+    --red:#c02626;      --red-bg:#fdf3f3;   --red-line:#f3d3d3;
+    --yellow:#b45309;   --yellow-bg:#fefaf2; --yellow-line:#f4e3c6;
+    --green:#15803d;    --green-bg:#f3faf5;  --green-line:#cfe8d8;
+    --black:#27303f;    --black-bg:#f4f5f7;  --black-line:#dcdfe6;
+
+    --r-sm:8px; --r:12px; --r-lg:16px;
+    --shadow:0 1px 2px rgba(11,21,36,.04), 0 1px 3px rgba(11,21,36,.03);
+    --shadow-lift:0 4px 16px rgba(11,21,36,.07);
+  }
+
+  *,*::before,*::after{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased; font-feature-settings:"cv05","ss01";
+  }
+  .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-ligatures:none}
+
+  /* ---------- surfaces ---------- */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+  .card-lg{border-radius:var(--r-lg)}
+  .card-hover{transition:box-shadow .16s ease, border-color .16s ease}
+  .card-hover:hover{box-shadow:var(--shadow-lift);border-color:#dbe1ea}
+
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+  .section-num{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--accent)}
+
+  /* ---------- sidebar ---------- */
+  #sidebar{
+    width:252px;background:var(--surface);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;transition:transform .22s cubic-bezier(.4,0,.2,1);
+  }
+  .nav-item{
+    position:relative;display:flex;align-items:center;gap:11px;width:100%;
+    padding:9px 12px;border-radius:var(--r-sm);font-size:13.5px;font-weight:500;
+    color:var(--ink-2);text-align:left;transition:background .13s,color .13s;
+  }
+  .nav-item:hover{background:var(--surface-2);color:var(--ink)}
+  .nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .nav-item.active::before{
+    content:"";position:absolute;left:-13px;top:50%;transform:translateY(-50%);
+    width:3px;height:17px;border-radius:0 3px 3px 0;background:var(--accent);
+  }
+  .nav-item svg{width:17px;height:17px;flex:none;stroke-width:1.9}
+
+  /* ---------- chips / pills ---------- */
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+        padding:4px 10px;border-radius:999px;border:1px solid transparent;white-space:nowrap}
+  .dot{width:6px;height:6px;border-radius:999px;flex:none}
+  .dot-live{background:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
+  .dot-off{background:#b45309;box-shadow:0 0 0 3px rgba(180,83,9,.14)}
+
+  /* ---------- form ---------- */
+  label.fl{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+  label.fl .unit{font-weight:500;color:var(--ink-3)}
+  .hint{font-size:11px;color:var(--ink-3);margin-top:5px;line-height:1.45}
+  .inp{
+    width:100%;border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:9px 11px;font-size:13.5px;background:#fff;color:var(--ink);outline:none;
+    transition:border-color .13s, box-shadow .13s;
+  }
+  .inp::placeholder{color:#b6bfcc}
+  .inp:hover:not(:disabled){border-color:#d3d9e2}
+  .inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.11)}
+  .inp:disabled{background:var(--surface-2);color:var(--ink-3);cursor:not-allowed}
+  .inp.err{border-color:var(--red);box-shadow:0 0 0 3px rgba(192,38,38,.10)}
+  select.inp{
+    appearance:none;padding-right:32px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a97a8' stroke-width='2' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat;background-position:right 10px center;background-size:15px;
+  }
+
+  /* ---------- buttons ---------- */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+       border-radius:var(--r-sm);font-size:13.5px;font-weight:600;padding:10px 18px;
+       transition:background .13s,border-color .13s,opacity .13s,transform .08s}
+  .btn:active{transform:translateY(.5px)}
+  .btn:disabled{opacity:.6;cursor:not-allowed}
+  .btn-primary{background:var(--navy);color:#fff}
+  .btn-primary:hover:not(:disabled){background:#1c2a41}
+  .btn-accent{background:var(--accent);color:#fff}
+  .btn-accent:hover:not(:disabled){background:#1d4ed8}
+  .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink-2)}
+  .btn-ghost:hover:not(:disabled){background:var(--surface-2);border-color:#d9dfe7}
+
+  /* ---------- tables ---------- */
+  table.dt{width:100%;border-collapse:collapse;font-size:13px}
+  table.dt th{text-align:left;font-weight:600;color:var(--ink-2);padding:10px 12px;
+              border-bottom:1px solid var(--line);background:var(--surface-2);white-space:nowrap}
+  table.dt td{padding:10px 12px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+  table.dt tbody tr:last-child td{border-bottom:none}
+  .scroll-x{overflow-x:auto}
+
+  /* ---------- motion ---------- */
+  .fade{animation:fade .2s cubic-bezier(.4,0,.2,1)}
+  @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  .bar-fill{transition:width .5s cubic-bezier(.4,0,.2,1)}
+  .spin{animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  /* ---------- responsive ---------- */
+  #scrim{backdrop-filter:blur(1px)}
+  @media (max-width:1023px){
+    #sidebar{position:fixed;inset:0 auto 0 0;z-index:60;transform:translateX(-100%)}
+    #sidebar.open{transform:none;box-shadow:0 8px 40px rgba(11,21,36,.18)}
+  }
+</style>
+</head>
+
+<body>
+<div class="min-h-screen flex">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside id="sidebar">
+    <div class="h-[62px] flex items-center gap-2.5 px-5 border-b" style="border-color:var(--line)">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:var(--navy)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" class="w-[17px] h-[17px]">
+          <path d="M3 12h4l2.5-7 4 14 2.5-7h5"/>
+        </svg>
+      </div>
+      <div class="leading-none">
+        <div class="text-[15px] font-bold tracking-tight">TriageAI</div>
+        <div class="text-[10.5px] mt-1" style="color:var(--ink-3)">Clinical Intelligence</div>
+      </div>
+    </div>
+
+    <nav id="nav" class="p-3 pl-4 space-y-0.5 flex-1"></nav>
+
+    <div class="p-3">
+      <div id="sidebarStatus" class="rounded-[10px] p-3" style="background:var(--surface-2);border:1px solid var(--line)"></div>
+    </div>
+  </aside>
+  <div id="scrim" class="hidden fixed inset-0 bg-slate-900/25 z-50 lg:hidden"></div>
+
+  <!-- ============ MAIN ============ -->
+  <div class="flex-1 min-w-0 flex flex-col">
+    <header class="h-[62px] sticky top-0 z-40 flex items-center justify-between gap-4 px-4 sm:px-8"
+            style="background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="menuBtn" class="lg:hidden -ml-2 p-2 rounded-lg" style="color:var(--ink-2)" aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="w-5 h-5"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="min-w-0">
+          <h1 id="pageTitle" class="text-[15px] font-semibold tracking-tight truncate">Dashboard</h1>
+          <p id="pageSub" class="text-[11.5px] truncate" style="color:var(--ink-3)"></p>
+        </div>
+      </div>
+      <div id="headerStatus" class="flex items-center gap-2"></div>
+    </header>
+
+    <main id="view" class="flex-1 w-full max-w-[1280px] p-4 sm:p-8"></main>
+
+    <footer class="px-4 sm:px-8 py-5 text-[11.5px] leading-relaxed" style="border-top:1px solid var(--line);color:var(--ink-3)">
+      <span style="color:var(--ink-2);font-weight:600">Decision-support prototype.</span>
+      TriageAI produces an ML-assisted triage classification. It does not replace clinical judgment or professional medical care.
+    </footer>
+  </div>
+</div>
+
+<script>
+/* ==========================================================================
+   DOCUMENTED PROJECT CONSTANTS
+   Every number below comes from the MM26ML03 notebook / README.
+   Nothing here is estimated. Unknown values render as "Not available".
+   ========================================================================== */
+const CLASSES = ["RED","YELLOW","GREEN","BLACK"];
+
+const CLASS_META = {
+  RED:    {desc:"Immediate / highest priority", c:"var(--red)",    bg:"var(--red-bg)",    line:"var(--red-line)"},
+  YELLOW: {desc:"Urgent",                       c:"var(--yellow)", bg:"var(--yellow-bg)", line:"var(--yellow-line)"},
+  GREEN:  {desc:"Lower priority",               c:"var(--green)",  bg:"var(--green-bg)",  line:"var(--green-line)"},
+  BLACK:  {desc:"Deceased / expectant category as defined by the project",
+                                                c:"var(--black)",  bg:"var(--black-bg)",  line:"var(--black-line)"}
+};
+
+const METRICS = {
+  accuracy:0.9323, macroF1:0.9325, weightedF1:0.9311, cost:33,
+  cvMean:0.9141, cvStd:0.0163,
+  trainN:664, validN:133, testN:112, nFeatures:37
+};
+
+const CONFUSION = [[21,5,0,1],[0,57,0,0],[0,3,32,0],[0,0,0,14]];
+
+const PER_CLASS = [
+  {c:"RED",    p:1.00, r:0.78, f1:0.88, support:27},
+  {c:"YELLOW", p:0.88, r:1.00, f1:0.93, support:57},
+  {c:"GREEN",  p:1.00, r:0.91, f1:0.96, support:35},
+  {c:"BLACK",  p:0.93, r:1.00, f1:0.97, support:14}
+];
+
+const MODELS = [
+  {m:"XGBoost",             acc:0.9323, f1:0.9325, wf1:0.9311, cost:33, final:true},
+  {m:"CatBoost",            acc:0.9248, f1:0.9268, wf1:0.9236, cost:36},
+  {m:"Gradient Boosting",   acc:0.9173, f1:0.9188, wf1:0.9156, cost:39},
+  {m:"LightGBM",            acc:0.9248, f1:0.9161, wf1:0.9218, cost:42},
+  {m:"Random Forest",       acc:0.9248, f1:0.9161, wf1:0.9218, cost:42},
+  {m:"Logistic Regression", acc:0.9098, f1:0.9195, wf1:0.9092, cost:48}
+];
+
+const COST_MATRIX = [[0,5,10,5],[2,0,3,2],[1,1,0,1],[2,2,2,0]];
+
+const HYPERPARAMS = [
+  ["n_estimators","400"],["max_depth","5"],["learning_rate","0.05"],
+  ["subsample","0.85"],["colsample_bytree","0.85"],
+  ["objective","multi:softprob"],["num_class","4"],
+  ["eval_metric","mlogloss"],["random_state","42"]
+];
+
+/* ==========================================================================
+   FORM PRESENTATION METADATA
+   Labels / units / ranges only. The set of inputs and every categorical
+   option comes from GET /schema — nothing categorical is invented here.
+   ========================================================================== */
+const FIELD_META = {
+  gender:               {label:"Gender"},
+  race:                 {label:"Race"},
+  arrival_transport:    {label:"Arrival Transport"},
+
+  temperature:          {label:"Temperature", unit:"°F", step:"0.1", ph:"97.9"},
+  heartrate:            {label:"Heart Rate", unit:"bpm", step:"1", ph:"112"},
+  resprate:             {label:"Respiratory Rate", unit:"breaths/min", step:"1", ph:"28"},
+  o2sat:                {label:"O₂ Saturation", unit:"%", step:"0.1", min:0, max:100, ph:"89"},
+  sbp:                  {label:"Systolic BP", unit:"mmHg", step:"1", ph:"93"},
+  dbp:                  {label:"Diastolic BP", unit:"mmHg", step:"1", ph:"46"},
+  bp_unobtainable:      {label:"BP Unobtainable", hint:"1 when blood pressure could not be obtained."},
+  pain_score:           {label:"Pain Score", unit:"0–10", step:"1", min:0, max:10, ph:"0"},
+  pain_assessable:      {label:"Pain Assessable", hint:"1 when a pain score could be elicited."},
+
+  gcs_eye:              {label:"GCS Eye", unit:"1–4", step:"1", min:1, max:4, ph:"4"},
+  gcs_verbal:           {label:"GCS Verbal", unit:"1–5", step:"1", min:1, max:5, ph:"5"},
+  gcs_motor:            {label:"GCS Motor", unit:"1–6", step:"1", min:1, max:6, ph:"6",
+                         hint:"Highest-ranked feature in the model's importance plot."},
+  gcs_total:            {label:"GCS Total", unit:"3–15", step:"1", min:3, max:15, ph:"15",
+                         hint:"Auto-filled from the three components; editable."},
+  avpu:                 {label:"AVPU"},
+  avpu_ordinal:         {label:"AVPU Ordinal", step:"1"},
+  follows_commands:     {label:"Follows Commands", step:"1"},
+  consciousness_source: {label:"Consciousness Source"},
+
+  chiefcomplaint:       {label:"Chief Complaint",
+                         hint:"Chief-complaint categories appear repeatedly in the top-15 importances."}
+};
+
+const UNIT_BY_PREFIX = [
+  [/^vs_heartrate_/, "bpm"], [/^vs_resprate_/, "breaths/min"],
+  [/^vs_o2sat_/, "%"], [/^vs_sbp_/, "mmHg"], [/^vs_dbp_/, "mmHg"],
+  [/^vs_temperature_/, "°F"]
+];
+
+const SECTIONS = [
+  {num:"01", title:"Patient Demographics", icon:"user",
+   desc:"Identity and mode of arrival as recorded at presentation.",
+   names:["gender","race","arrival_transport"]},
+  {num:"02", title:"Vital Signs", icon:"activity",
+   desc:"Triage-time observations. Leave blank when not recorded — the pipeline imputes.",
+   names:["temperature","heartrate","resprate","o2sat","sbp","dbp","bp_unobtainable","pain_score","pain_assessable"]},
+  {num:"03", title:"Neurological Status", icon:"brain",
+   desc:"Glasgow Coma Scale components and level of consciousness.",
+   names:["gcs_eye","gcs_verbal","gcs_motor","gcs_total","avpu","avpu_ordinal","follows_commands","consciousness_source"]},
+  {num:"04", title:"Presentation", icon:"clipboard",
+   desc:"Reason for the emergency department encounter.",
+   names:["chiefcomplaint"]},
+  {num:"05", title:"Historical Vital Statistics", icon:"trend",
+   desc:"Per-patient min / max / mean aggregates supplied by the dataset.",
+   match:n => /^vs_/.test(n), collapsed:true},
+  {num:"06", title:"Encounter Summary", icon:"layers",
+   desc:"Remaining model inputs reported by GET /schema — counts of recorded vital-sign readings, diagnoses and home medications.",
+   rest:true, collapsed:true}
+];
+
+/* Used only when /schema is unreachable, so the page still renders a form.
+   These names are documented in the notebook; categorical options are NOT
+   guessed — those selects stay disabled until the schema loads. */
+const FALLBACK_FEATURES = [
+  "gender","race","arrival_transport",
+  "temperature","heartrate","resprate","o2sat","sbp","dbp",
+  "bp_unobtainable","pain_score","pain_assessable",
+  "gcs_eye","gcs_verbal","gcs_motor","gcs_total","avpu","consciousness_source",
+  "chiefcomplaint",
+  "vs_heartrate_min","vs_heartrate_max","vs_heartrate_mean",
+  "vs_resprate_min","vs_resprate_max","vs_resprate_mean",
+  "vs_o2sat_min","vs_o2sat_max","vs_o2sat_mean",
+  "vs_sbp_min","vs_sbp_max","vs_sbp_mean",
+  "vs_temperature_max"
+];
+const FALLBACK_CATEGORICAL = ["gender","race","arrival_transport","avpu","consciousness_source","chiefcomplaint"];
+
+/* ========================================================================== */
+const ICONS = {
+  dashboard:'<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/>',
+  assessment:'<path d="M15 2H9a1 1 0 00-1 1v1a1 1 0 001 1h6a1 1 0 001-1V3a1 1 0 00-1-1z"/><path d="M8 4H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2"/><path d="M12 11v6M9 14h6"/>',
+  results:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  analytics:'<path d="M3 3v18h18"/><path d="M7.5 15.5v3M12 9.5v9M16.5 12.5v6"/>',
+  model:'<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M9.5 2v3M14.5 2v3M9.5 19v3M14.5 19v3M2 9.5h3M2 14.5h3M19 9.5h3M19 14.5h3"/>',
+  about:'<circle cx="12" cy="12" r="9"/><path d="M12 11.5v5M12 8h.01"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/>',
+  activity:'<path d="M3 12h4l2.5-7 4 14 2.5-7h5"/>',
+  brain:'<path d="M9.5 3A3 3 0 006.6 5.3 3 3 0 005 10.8V15a3 3 0 003 3h1.5V3z"/><path d="M14.5 3A3 3 0 0117.4 5.3 3 3 0 0119 10.8V15a3 3 0 01-3 3h-1.5V3z"/>',
+  clipboard:'<path d="M15 2H9a1 1 0 00-1 1v1a1 1 0 001 1h6a1 1 0 001-1V3a1 1 0 00-1-1z"/><path d="M8 4H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-2"/>',
+  trend:'<path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/>',
+  layers:'<path d="M12 3l9 4.5-9 4.5-9-4.5L12 3z"/><path d="M3 12l9 4.5L21 12"/><path d="M3 16.5L12 21l9-4.5"/>',
+  cpu:'<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M9.5 2v3M14.5 2v3M9.5 19v3M14.5 19v3M2 9.5h3M2 14.5h3M19 9.5h3M19 14.5h3"/>',
+  shield:'<path d="M12 3l7.5 3v6c0 4.5-3 8-7.5 9.5C7.5 20 4.5 16.5 4.5 12V6L12 3z"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>',
+  arrow:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  chevron:'<path d="M6 9l6 6 6-6"/>',
+  database:'<ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  sparkles:'<path d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z"/><path d="M19 15l.9 2.3 2.1.7-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.7L19 15z"/>'
+};
+const icon = (k, cls="w-4 h-4") =>
+  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="${cls}">${ICONS[k]||""}</svg>`;
+
+const PAGES = [
+  {id:"dashboard",  label:"Dashboard",         icon:"dashboard",  sub:"Model status and validated performance"},
+  {id:"assessment", label:"Patient Assessment",icon:"assessment", sub:"Enter patient information for ML-assisted classification"},
+  {id:"results",    label:"Prediction Results",icon:"results",    sub:"Live model output and assessment summary"},
+  {id:"analytics",  label:"Analytics",         icon:"analytics",  sub:"Validation performance and cost-aware evaluation"},
+  {id:"model",      label:"Model Information", icon:"model",      sub:"XGBoost pipeline, preprocessing and parameters"},
+  {id:"about",      label:"About",             icon:"about",      sub:"Problem statement MM26ML03 · Team MM2626"}
+];
+
+/* ========================================================================== */
+const state = {
+  page:"dashboard",
+  schema:null,          // GET /schema payload — source of truth for inputs
+  api:{live:false, checked:false, detail:"Connecting…"},
+  form:{},              // last entered values, keyed by feature name
+  errors:{},
+  result:null,
+  submitted:null,
+  aiExplanation:null,
+  aiLoading:false,
+  aiError:null,
+  loading:false,
+  open:{}               // collapsed-section state
+};
+
+const pct  = v => (v*100).toFixed(1) + "%";
+const esc  = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const titleize = n => n.replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase());
+
+function meta(name){
+  const m = FIELD_META[name] || {};
+  if(m.unit) return m;
+  const hit = UNIT_BY_PREFIX.find(([re]) => re.test(name));
+  return hit ? {...m, unit:hit[1]} : m;
+}
+const fieldLabel = n => (FIELD_META[n] && FIELD_META[n].label) || titleize(n);
+
+/* ---- schema accessors ---------------------------------------------------- */
+const features    = () => (state.schema && state.schema.features) || FALLBACK_FEATURES;
+const categorical = () => (state.schema && state.schema.categorical) || FALLBACK_CATEGORICAL;
+const optionsFor  = n => (state.schema && state.schema.categories && state.schema.categories[n]) || null;
+const isCat       = n => categorical().includes(n);
+
+function sectionFields(){
+  const all = features();
+  const claimed = new Set();
+  const out = SECTIONS.map(s => {
+    let names;
+    if(s.rest)       names = [];
+    else if(s.match) names = all.filter(s.match);
+    else             names = s.names.filter(n => all.includes(n));
+    names.forEach(n => claimed.add(n));
+    return {...s, fields:names};
+  });
+  const rest = out.find(s => s.rest);
+  if(rest) rest.fields = all.filter(n => !claimed.has(n));
+  return out.filter(s => s.fields.length);
+}
+
+/* ========================================================================== */
+/*  SHARED BLOCKS                                                             */
+/* ========================================================================== */
+function metricCard(label, value, sub){
+  return `
+  <div class="card card-hover p-5">
+    <div class="eyebrow">${esc(label)}</div>
+    <div class="text-[27px] font-bold tracking-tight mt-2.5 mono" style="color:var(--navy)">${value}</div>
+    ${sub ? `<div class="text-[11.5px] mt-1.5" style="color:var(--ink-3)">${esc(sub)}</div>` : ""}
+  </div>`;
+}
+function factCard(label, value, sub){
+  return `
+  <div class="card p-4">
+    <div class="eyebrow">${esc(label)}</div>
+    <div class="text-[15px] font-semibold mt-1.5">${esc(value)}</div>
+    ${sub ? `<div class="text-[11.5px] mt-0.5" style="color:var(--ink-3)">${esc(sub)}</div>` : ""}
+  </div>`;
+}
+function statusPill(){
+  const live = state.api.live;
+  return `<span class="chip" style="background:${live?"var(--green-bg)":"var(--yellow-bg)"};
+    color:${live?"var(--green)":"var(--yellow)"};border-color:${live?"var(--green-line)":"var(--yellow-line)"}">
+    <span class="dot ${live?"dot-live":"dot-off"}"></span>${live?"LIVE MODEL":"API OFFLINE"}</span>`;
+}
+
+/* ========================================================================== */
+/*  PAGE — DASHBOARD                                                          */
+/* ========================================================================== */
+function pageDashboard(){
+  const live = state.api.live;
+  return `
+  <div class="space-y-7 fade">
+
+    <section class="card card-lg p-7 sm:p-9" style="background:linear-gradient(180deg,#fff,var(--surface-2))">
+      <div class="flex flex-wrap items-start justify-between gap-6">
+        <div class="max-w-[640px]">
+          <span class="chip" style="background:${live?"var(--green-bg)":"var(--yellow-bg)"};
+            color:${live?"var(--green)":"var(--yellow)"};border-color:${live?"var(--green-line)":"var(--yellow-line)"}">
+            <span class="dot ${live?"dot-live":"dot-off"}"></span>${live?"Model Operational":"Model Unreachable"}</span>
+          <h2 class="text-[30px] sm:text-[34px] font-bold tracking-tight mt-4 leading-[1.15]">AI-Assisted Emergency Triage</h2>
+          <p class="text-[14.5px] mt-3 leading-relaxed" style="color:var(--ink-2)">
+            Machine-learning decision support for rapid triage classification.
+          </p>
+          <div class="flex flex-wrap gap-2.5 mt-6">
+            <button class="btn btn-primary" onclick="go('assessment')">
+              New Patient Assessment ${icon("arrow","w-[15px] h-[15px]")}
+            </button>
+            <button class="btn btn-ghost" onclick="go('analytics')">View Analytics</button>
+          </div>
+        </div>
+        <div class="card p-4 min-w-[210px]" style="background:var(--surface)">
+          <div class="eyebrow">Inference Endpoint</div>
+          <div class="text-[12.5px] mono mt-2 break-all" style="color:var(--ink-2)">${esc(TriageAPI.baseUrl)}</div>
+          <div class="mt-3 pt-3" style="border-top:1px solid var(--line-soft)">${statusPill()}</div>
+          <div class="text-[11px] mt-2" style="color:var(--ink-3)">${esc(state.api.detail)}</div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="flex items-end justify-between mb-3">
+        <h3 class="eyebrow">Validated Performance — hold-out split, ${METRICS.validN} samples</h3>
+        <span class="text-[11.5px]" style="color:var(--ink-3)">5-fold CV ${METRICS.cvMean.toFixed(4)} ± ${METRICS.cvStd.toFixed(4)}</span>
+      </div>
+      <div class="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        ${metricCard("Accuracy",   (METRICS.accuracy*100).toFixed(2)+"%")}
+        ${metricCard("Macro-F1",   (METRICS.macroF1*100).toFixed(2)+"%")}
+        ${metricCard("Weighted-F1",(METRICS.weightedF1*100).toFixed(2)+"%")}
+        ${metricCard("Misclassification Cost", METRICS.cost, "Official matrix · lower is better")}
+      </div>
+      <div class="grid gap-4 grid-cols-2 lg:grid-cols-4 mt-4">
+        ${factCard("Training Set", METRICS.trainN + " patients")}
+        ${factCard("Model Inputs", METRICS.nFeatures + " features",
+            state.schema ? state.schema.features.length + " reported by /schema" : "Awaiting /schema")}
+        ${factCard("Model","XGBoost","Multiclass · multi:softprob")}
+        ${factCard("Classes","4 triage categories")}
+      </div>
+    </section>
+
+    <section class="card card-lg p-6 sm:p-7">
+      <h3 class="text-[15px] font-semibold tracking-tight">Triage Classification Framework</h3>
+      <p class="text-[12.5px] mt-1" style="color:var(--ink-3)">
+        The four target categories the model predicts, using the project's own terminology.
+      </p>
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-5">
+        ${CLASSES.map(c => {
+          const m = CLASS_META[c];
+          return `
+          <div class="rounded-[12px] p-4 card-hover" style="background:${m.bg};border:1px solid ${m.line}">
+            <div class="flex items-center gap-2">
+              <span class="dot" style="background:${m.c}"></span>
+              <span class="text-[12.5px] font-bold tracking-wide" style="color:${m.c}">${c}</span>
+            </div>
+            <div class="text-[12.5px] mt-2 leading-relaxed" style="color:var(--ink-2)">${m.desc}</div>
+          </div>`;
+        }).join("")}
+      </div>
+    </section>
+
+  </div>`;
+}
+
+/* ========================================================================== */
+/*  PAGE — PATIENT ASSESSMENT                                                 */
+/* ========================================================================== */
+function inputFor(name){
+  const m = meta(name);
+  const v = state.form[name] ?? "";
+  const err = state.errors[name];
+  const id = "f_" + name;
+
+  if(isCat(name)){
+    const opts = optionsFor(name);
+    if(!opts){
+      return `<select id="${id}" class="inp" disabled>
+        <option>Options load from /schema</option></select>`;
+    }
+    return `<select id="${id}" class="inp ${err?"err":""}" onchange="setField('${name}',this.value)">
+      <option value="">Not recorded</option>
+      ${opts.map(o => `<option value="${esc(o)}" ${String(v)===String(o)?"selected":""}>${esc(o)}</option>`).join("")}
+    </select>`;
+  }
+
+  const gcsPart = ["gcs_eye","gcs_verbal","gcs_motor"].includes(name);
+  return `<input id="${id}" type="number" inputmode="decimal"
+    class="inp ${err?"err":""}"
+    placeholder="${esc(m.ph || "—")}"
+    step="${m.step || "any"}"
+    ${m.min!=null?`min="${m.min}"`:""} ${m.max!=null?`max="${m.max}"`:""}
+    value="${esc(v)}"
+    oninput="setField('${name}',this.value${gcsPart?",true":""})">`;
+}
+
+function fieldBlock(name){
+  const m = meta(name);
+  const err = state.errors[name];
+  return `
+  <div>
+    <label class="fl" for="f_${name}">
+      ${esc(fieldLabel(name))} ${m.unit ? `<span class="unit">(${esc(m.unit)})</span>` : ""}
+    </label>
+    ${inputFor(name)}
+    ${err ? `<p class="hint" style="color:var(--red)">${esc(err)}</p>`
+          : (m.hint ? `<p class="hint">${esc(m.hint)}</p>` : "")}
+  </div>`;
+}
+
+function pageAssessment(){
+  const sections = sectionFields();
+  const total = features().length;
+  const filled = Object.values(state.form).filter(v => v !== "" && v != null).length;
+
+  return `
+  <div class="space-y-5 fade max-w-[1060px]">
+
+    <section class="card card-lg p-6 sm:p-7">
+      <div class="flex flex-wrap items-start justify-between gap-5">
+        <div class="max-w-[620px]">
+          <h2 class="text-[21px] font-bold tracking-tight">Patient Assessment</h2>
+          <p class="text-[13.5px] mt-1.5 leading-relaxed" style="color:var(--ink-2)">
+            Enter available patient information to generate an ML-assisted triage classification.
+          </p>
+          <p class="text-[12px] mt-3" style="color:var(--ink-3)">
+            Fields are generated from <span class="mono">GET /schema</span>, so they match the trained pipeline exactly.
+            Blank fields are imputed server-side by the same imputers used during training — nothing is filled in by this page.
+          </p>
+        </div>
+        <div class="text-right">
+          <div class="eyebrow">Inputs Provided</div>
+          <div class="text-[24px] font-bold mono mt-1" style="color:var(--navy)">${filled}<span class="text-[15px]" style="color:var(--ink-3)">/${total}</span></div>
+          <div class="text-[11px] mt-0.5" style="color:var(--ink-3)">${state.schema ? "Schema loaded" : "Schema unavailable"}</div>
+        </div>
+      </div>
+    </section>
+
+    ${!state.api.live ? `
+    <div class="card p-4 flex items-start gap-3" style="background:var(--yellow-bg);border-color:var(--yellow-line)">
+      <span style="color:var(--yellow)">${icon("about","w-[17px] h-[17px]")}</span>
+      <div class="text-[12.5px]" style="color:var(--ink-2)">
+        <strong>Backend not reachable.</strong> Start the FastAPI service on
+        <span class="mono">${esc(TriageAPI.baseUrl)}</span> — predictions are produced only by the live XGBoost pipeline.
+      </div>
+    </div>` : ""}
+
+    ${sections.map(s => {
+      const open = state.open[s.num] ?? !s.collapsed;
+      return `
+      <section class="card card-lg overflow-hidden">
+        <button type="button" class="w-full flex items-center justify-between gap-4 p-5 sm:p-6 text-left"
+                onclick="toggleSection('${s.num}')">
+          <div class="flex items-start gap-3.5 min-w-0">
+            <span class="w-9 h-9 rounded-[10px] flex items-center justify-center flex-none"
+                  style="background:var(--accent-soft);color:var(--accent)">${icon(s.icon,"w-[17px] h-[17px]")}</span>
+            <div class="min-w-0">
+              <div class="section-num">SECTION ${s.num}</div>
+              <h3 class="text-[15px] font-semibold tracking-tight mt-0.5">${esc(s.title)}</h3>
+              <p class="text-[12px] mt-1 leading-relaxed" style="color:var(--ink-3)">${esc(s.desc)}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 flex-none">
+            <span class="chip" style="background:var(--surface-2);color:var(--ink-3);border-color:var(--line)">${s.fields.length}</span>
+            <span style="color:var(--ink-3);transform:rotate(${open?180:0}deg);transition:transform .18s">${icon("chevron","w-4 h-4")}</span>
+          </div>
+        </button>
+        ${open ? `
+        <div class="px-5 sm:px-6 pb-6 -mt-1">
+          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            ${s.fields.map(fieldBlock).join("")}
+          </div>
+        </div>` : ""}
+      </section>`;
+    }).join("")}
+
+    <section class="card card-lg p-5 sm:p-6 flex flex-wrap items-center justify-between gap-4 sticky bottom-4"
+             style="box-shadow:var(--shadow-lift)">
+      <div class="text-[12px] max-w-[520px]" style="color:var(--ink-3)">
+        Output is an ML-assisted classification produced by the trained XGBoost pipeline. It is not a medical diagnosis.
+      </div>
+      <div class="flex gap-2.5">
+        <button class="btn btn-ghost" onclick="clearForm()" ${state.loading?"disabled":""}>Clear</button>
+        <button class="btn btn-accent" onclick="assess()" ${state.loading || !state.api.live ? "disabled":""}>
+          ${state.loading
+            ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="w-4 h-4 spin"><path d="M21 12a9 9 0 11-6.2-8.6" stroke-linecap="round"/></svg> Analyzing…`
+            : `${icon("sparkles","w-[15px] h-[15px]")} Generate Triage Prediction`}
+        </button>
+      </div>
+    </section>
+  </div>`;
+}
+
+/* ========================================================================== */
+/*  PAGE — RESULTS                                                            */
+/* ========================================================================== */
+function loadingPanel(){
+  return `
+  <div class="card card-lg p-14 text-center fade max-w-[640px] mx-auto">
+    <div class="mx-auto w-11 h-11 rounded-full flex items-center justify-center"
+         style="background:var(--accent-soft);color:var(--accent)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="w-5 h-5 spin"><path d="M21 12a9 9 0 11-6.2-8.6" stroke-linecap="round"/></svg>
+    </div>
+    <h2 class="text-[16px] font-semibold mt-5">Analyzing patient data…</h2>
+    <p class="text-[13px] mt-1.5" style="color:var(--ink-2)">Running XGBoost triage model</p>
+    <div class="h-1 rounded-full mt-7 overflow-hidden mx-auto max-w-[280px]" style="background:var(--line-soft)">
+      <div class="h-full bar-fill" style="width:70%;background:var(--accent)"></div>
+    </div>
+  </div>`;
+}
+
+function probabilityBars(p){
+  return CLASSES.map(c => {
+    const m = CLASS_META[c];
+    const v = Number(p[c] || 0);
+    return `
+    <div>
+      <div class="flex items-baseline justify-between mb-1.5">
+        <span class="text-[12.5px] font-semibold tracking-wide" style="color:${m.c}">${c}</span>
+        <span class="text-[12.5px] mono font-semibold" style="color:var(--ink-2)">${pct(v)}</span>
+      </div>
+      <div class="h-[7px] rounded-full overflow-hidden" style="background:var(--line-soft)">
+        <div class="h-full rounded-full bar-fill" style="width:${(v*100).toFixed(1)}%;background:${m.c}"></div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+function pageResults(){
+  if(state.loading) return loadingPanel();
+
+  if(!state.result) return `
+    <div class="card card-lg p-14 text-center fade max-w-[620px] mx-auto">
+      <div class="mx-auto w-11 h-11 rounded-full flex items-center justify-center"
+           style="background:var(--accent-soft);color:var(--accent)">${icon("results","w-5 h-5")}</div>
+      <h2 class="text-[16px] font-semibold mt-5">No assessment yet</h2>
+      <p class="text-[13px] mt-1.5 leading-relaxed" style="color:var(--ink-2)">
+        Submit patient information to generate an ML-assisted triage classification from the live model.
+      </p>
+      <button class="btn btn-primary mt-6" onclick="go('assessment')">Go to Patient Assessment</button>
+    </div>`;
+
+  const r = state.result;
+  const m = CLASS_META[r.prediction];
+  const conf = Number(r.probabilities[r.prediction] || 0);
+  const sum = CLASSES.reduce((a,c) => a + Number(r.probabilities[c] || 0), 0);
+  const entered = features().filter(n => state.submitted && state.submitted[n] !== undefined);
+
+  return `
+  <div class="space-y-6 fade">
+
+    <section class="card card-lg overflow-hidden">
+      <div class="p-7 sm:p-9" style="background:${m.bg};border-bottom:1px solid ${m.line}">
+        <div class="flex flex-wrap items-center justify-between gap-7">
+          <div>
+            <div class="eyebrow">Triage Prediction</div>
+            <div class="text-[12.5px] mt-2" style="color:var(--ink-2)">Predicted Category</div>
+            <div class="flex items-center gap-4 mt-1.5">
+              <span class="text-[46px] leading-none font-extrabold tracking-tight" style="color:${m.c}">${esc(r.prediction)}</span>
+              <span class="chip" style="background:#fff;color:var(--green);border-color:var(--green-line)">
+                <span class="dot dot-live"></span>LIVE MODEL</span>
+            </div>
+            <div class="text-[13px] mt-2.5" style="color:var(--ink-2)">${m.desc}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-[40px] leading-none font-bold mono" style="color:${m.c}">${pct(conf)}</div>
+            <div class="text-[12px] mt-2" style="color:var(--ink-2)">Model Probability</div>
+          </div>
+        </div>
+      </div>
+      <div class="grid sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style="border-color:var(--line)">
+        ${[["Assessment ID", r.id],["Generated", r.ts],["Source","Live XGBoost model"]]
+          .map(([k,v]) => `<div class="p-4 sm:p-5"><div class="eyebrow">${esc(k)}</div>
+            <div class="text-[13px] font-medium mt-1.5 mono">${esc(v)}</div></div>`).join("")}
+      </div>
+    </section>
+
+    <div class="grid gap-5 lg:grid-cols-5">
+      <section class="card card-lg p-6 lg:col-span-3">
+        <h3 class="text-[15px] font-semibold tracking-tight">Class Probabilities</h3>
+        <p class="text-[12px] mt-1 mb-5" style="color:var(--ink-3)">
+          Softmax output over the four triage categories · sum ${sum.toFixed(4)}
+        </p>
+        <div class="space-y-4">${probabilityBars(r.probabilities)}</div>
+        <p class="text-[11.5px] mt-6 pt-4" style="border-top:1px solid var(--line-soft);color:var(--ink-3)">
+          Generated by live XGBoost model.
+        </p>
+      </section>
+
+      <section class="card card-lg p-6 lg:col-span-2">
+        <h3 class="text-[15px] font-semibold tracking-tight">Technical Information</h3>
+        <div class="mt-4 space-y-0">
+          ${[
+            ["Model","XGBoost Pipeline"],
+            ["Objective","multi:softprob"],
+            ["Input Features", String(features().length)],
+            ["Training Samples", String(METRICS.trainN)],
+            ["Endpoint", TriageAPI.baseUrl + "/predict"]
+          ].map(([k,v]) => `
+          <div class="flex items-center justify-between gap-4 py-2.5" style="border-bottom:1px solid var(--line-soft)">
+            <span class="text-[12.5px]" style="color:var(--ink-2)">${esc(k)}</span>
+            <span class="text-[12.5px] font-semibold mono text-right break-all">${esc(v)}</span>
+          </div>`).join("")}
+        </div>
+        <div class="rounded-[10px] p-3.5 mt-5" style="background:var(--accent-soft);border:1px solid var(--accent-line)">
+          <p class="text-[12px] leading-relaxed" style="color:var(--ink-2)">
+            ML-assisted classification, not a medical diagnosis. Clinical judgment governs the final triage decision.
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= AI TRIAGE ASSISTANT ================= -->
+    <section class="card card-lg overflow-hidden">
+      <div class="p-6 sm:p-7" style="background:linear-gradient(180deg,#fff,var(--surface-2))">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div class="flex items-start gap-3.5">
+            <span class="w-10 h-10 rounded-[11px] flex items-center justify-center flex-none"
+                  style="background:var(--accent-soft);color:var(--accent)">
+              ${icon("sparkles","w-[19px] h-[19px]")}
+            </span>
+            <div>
+              <div class="eyebrow">Agentic AI</div>
+              <h3 class="text-[17px] font-bold tracking-tight mt-0.5">AI Triage Assistant</h3>
+              <p class="text-[12px] mt-1 leading-relaxed" style="color:var(--ink-3)">
+                Model-grounded explanation generated from the live XGBoost result and submitted assessment data.
+              </p>
+            </div>
+          </div>
+          <span class="chip" style="background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)">
+            Gemini AI
+          </span>
+        </div>
+      </div>
+
+      <div class="px-6 sm:px-7 pb-7">
+        ${state.aiLoading ? `
+          <div class="rounded-[12px] p-5" style="background:var(--surface-2);border:1px solid var(--line-soft)">
+            <div class="flex items-center gap-3">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                   class="w-5 h-5 spin" style="color:var(--accent)">
+                <path d="M21 12a9 9 0 11-6.2-8.6" stroke-linecap="round"/>
+              </svg>
+              <div>
+                <div class="text-[13px] font-semibold">Generating model-grounded explanation…</div>
+                <div class="text-[11.5px] mt-0.5" style="color:var(--ink-3)">
+                  XGBoost prediction is already available.
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : state.aiExplanation ? `
+          <div class="rounded-[12px] p-5 sm:p-6" style="background:var(--surface-2);border:1px solid var(--line-soft)">
+            <div class="text-[12.5px] leading-[1.75] whitespace-pre-wrap" style="color:var(--ink-2)">
+              ${esc(state.aiExplanation)}
+            </div>
+          </div>
+        ` : `
+          <div class="rounded-[12px] p-5" style="background:var(--surface-2);border:1px solid var(--line-soft)">
+            <div class="text-[13px] font-semibold">AI explanation unavailable</div>
+            <div class="text-[12px] mt-1 leading-relaxed" style="color:var(--ink-3)">
+              The XGBoost prediction is still valid. ${esc(state.aiError || "The AI service did not return an explanation.")}
+            </div>
+          </div>
+        `}
+
+        <div class="rounded-[10px] p-4 mt-4" style="background:var(--yellow-bg);border:1px solid var(--yellow-line)">
+          <div class="flex items-start gap-3">
+            <span class="flex-none mt-0.5" style="color:var(--yellow)">
+              ${icon("shield","w-[17px] h-[17px]")}
+            </span>
+            <p class="text-[11.5px] leading-relaxed" style="color:var(--ink-2)">
+              <strong>Decision-support notice:</strong>
+              The AI assistant summarizes the submitted data and the XGBoost model output.
+              It does not replace professional clinical assessment, diagnosis, or treatment planning,
+              and it does not independently determine the triage category.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-lg p-6">
+      <h3 class="text-[15px] font-semibold tracking-tight">Assessment Summary</h3>
+      <p class="text-[12px] mt-1 mb-5" style="color:var(--ink-3)">
+        Values submitted to the model. Fields left blank were imputed server-side by the training pipeline and are not shown.
+      </p>
+      ${entered.length ? `
+      <div class="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4">
+        ${entered.map(n => {
+          const mm = meta(n);
+          return `<div class="rounded-[10px] p-3.5" style="background:var(--surface-2);border:1px solid var(--line-soft)">
+            <div class="text-[10.5px] mono" style="color:var(--ink-3)">${esc(n)}</div>
+            <div class="text-[14px] font-semibold mt-1">${esc(state.submitted[n])}
+              <span class="text-[11px] font-normal" style="color:var(--ink-3)">${esc(mm.unit || "")}</span></div>
+          </div>`;
+        }).join("")}
+      </div>` : `<p class="text-[13px]" style="color:var(--ink-3)">Not available — no values were entered.</p>`}
+    </section>
+  </div>`;
+}
+
+/* ========================================================================== */
+/*  PAGE — ANALYTICS                                                          */
+/* ========================================================================== */
+function pageAnalytics(){
+  const cmMax = 57;
+  return `
+  <div class="space-y-6 fade">
+
+    <section>
+      <h3 class="eyebrow mb-3">Model Performance — validation split (${METRICS.validN} samples)</h3>
+      <div class="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        ${metricCard("Accuracy",   (METRICS.accuracy*100).toFixed(2)+"%")}
+        ${metricCard("Macro-F1",   (METRICS.macroF1*100).toFixed(2)+"%")}
+        ${metricCard("Weighted-F1",(METRICS.weightedF1*100).toFixed(2)+"%")}
+        ${metricCard("Total Cost", METRICS.cost, "Official cost matrix")}
+      </div>
+    </section>
+
+    <div class="grid gap-5 xl:grid-cols-2">
+      <section class="card card-lg p-6">
+        <h3 class="text-[15px] font-semibold tracking-tight">Confusion Matrix</h3>
+        <p class="text-[12px] mt-1 mb-4" style="color:var(--ink-3)">Rows = actual, columns = predicted</p>
+        <div class="scroll-x">
+          <table class="dt" style="min-width:400px">
+            <thead><tr><th>Actual ↓ / Pred →</th>
+              ${CLASSES.map(c => `<th class="text-center" style="color:${CLASS_META[c].c}">${c}</th>`).join("")}</tr></thead>
+            <tbody>
+              ${CONFUSION.map((row,i) => `<tr>
+                <td class="font-semibold" style="color:${CLASS_META[CLASSES[i]].c}">${CLASSES[i]}</td>
+                ${row.map(v => `<td class="text-center mono font-semibold"
+                  style="background:${v?`rgba(37,99,235,${(0.07+0.68*(v/cmMax)).toFixed(3)})`:"transparent"};
+                         color:${v/cmMax>0.45?"#fff":"var(--ink)"}">${v}</td>`).join("")}
+              </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+        <p class="text-[11.5px] mt-4 leading-relaxed" style="color:var(--ink-3)">
+          RED recall is the weakest class at 0.78. There were no RED → GREEN errors on this split, the error the cost matrix penalises most.
+        </p>
+      </section>
+
+      <section class="card card-lg p-6">
+        <h3 class="text-[15px] font-semibold tracking-tight">Per-Class Performance</h3>
+        <p class="text-[12px] mt-1 mb-4" style="color:var(--ink-3)">XGBoost, validation split</p>
+        <table class="dt">
+          <thead><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Support</th></tr></thead>
+          <tbody>
+            ${PER_CLASS.map(r => `<tr>
+              <td class="font-semibold" style="color:${CLASS_META[r.c].c}">${r.c}</td>
+              <td class="mono">${r.p.toFixed(2)}</td>
+              <td class="mono">${r.r.toFixed(2)}</td>
+              <td class="mono">${r.f1.toFixed(2)}</td>
+              <td class="mono" style="color:var(--ink-3)">${r.support}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </section>
+    </div>
+
+    <section class="card card-lg p-6">
+      <h3 class="text-[15px] font-semibold tracking-tight">Model Comparison</h3>
+      <p class="text-[12px] mt-1 mb-5" style="color:var(--ink-3)">
+        Six model families trained on the same preprocessing pipeline and scored on the same split.
+      </p>
+      <div class="space-y-3.5">
+        ${MODELS.map(mo => `
+        <div class="flex items-center gap-4">
+          <div class="w-[150px] flex-none text-[12.5px] ${mo.final?"font-semibold":""}">
+            ${esc(mo.m)}${mo.final?` <span class="chip ml-1" style="background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)">FINAL</span>`:""}
+          </div>
+          <div class="flex-1 h-[7px] rounded-full overflow-hidden min-w-[80px]" style="background:var(--line-soft)">
+            <div class="h-full rounded-full bar-fill"
+                 style="width:${(((mo.acc-0.88)/0.06)*100).toFixed(1)}%;background:${mo.final?"var(--accent)":"#b9c4d4"}"></div>
+          </div>
+          <div class="w-[68px] text-right mono text-[12.5px] font-semibold">${mo.acc.toFixed(4)}</div>
+          <div class="w-[56px] text-right mono text-[12px]" style="color:var(--ink-3)">cost ${mo.cost}</div>
+        </div>`).join("")}
+      </div>
+      <div class="scroll-x mt-6">
+        <table class="dt">
+          <thead><tr><th>Model</th><th>Accuracy</th><th>Macro-F1</th><th>Weighted-F1</th><th>Total Cost ↓</th></tr></thead>
+          <tbody>
+            ${MODELS.map(mo => `<tr ${mo.final?'style="background:var(--accent-soft)"':""}>
+              <td class="font-semibold">${esc(mo.m)}</td>
+              <td class="mono">${mo.acc.toFixed(4)}</td>
+              <td class="mono">${mo.f1.toFixed(4)}</td>
+              <td class="mono">${mo.wf1.toFixed(4)}</td>
+              <td class="mono font-semibold">${mo.cost}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card card-lg p-6">
+      <h3 class="text-[15px] font-semibold tracking-tight">Cost Matrix</h3>
+      <p class="text-[12.5px] mt-1.5 mb-5 max-w-[720px] leading-relaxed" style="color:var(--ink-2)">
+        Misclassification costs are asymmetric; some errors carry greater penalty than others.
+        Classifying a RED patient as GREEN carries the heaviest penalty in the official matrix.
+      </p>
+      <div class="grid gap-6 lg:grid-cols-2">
+        <div class="scroll-x">
+          <table class="dt" style="min-width:400px">
+            <thead><tr><th>Actual ↓ / Pred →</th>
+              ${CLASSES.map(c => `<th class="text-center" style="color:${CLASS_META[c].c}">${c}</th>`).join("")}</tr></thead>
+            <tbody>
+              ${COST_MATRIX.map((row,i) => `<tr>
+                <td class="font-semibold" style="color:${CLASS_META[CLASSES[i]].c}">${CLASSES[i]}</td>
+                ${row.map(v => `<td class="text-center mono font-semibold"
+                  style="background:${v?`rgba(192,38,38,${(0.05+0.075*v).toFixed(3)})`:"transparent"}">${v}</td>`).join("")}
+              </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+        <div class="text-[12.5px] space-y-3 leading-relaxed" style="color:var(--ink-2)">
+          <p>Under-triage sits in the upper-right of the matrix and is penalised far more heavily than over-triage in the lower-left.</p>
+          <div class="rounded-[10px] p-4" style="background:var(--surface-2);border:1px solid var(--line-soft)">
+            <div class="eyebrow mb-2.5">Decision rules compared</div>
+            <table class="dt"><tbody>
+              <tr><td>Highest-probability (argmax)
+                <span class="chip ml-1" style="background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)">USED</span></td>
+                <td class="mono font-semibold text-right">33</td></tr>
+              <tr><td>Expected-cost rule</td><td class="mono text-right">35</td></tr>
+            </tbody></table>
+          </div>
+          <p>The expected-cost rule <span class="mono">argmin(P × COST_MATRIX)</span> scored a higher total cost on validation, so argmax was used for the final labels.</p>
+        </div>
+      </div>
+    </section>
+  </div>`;
+}
+
+/* ========================================================================== */
+/*  PAGE — MODEL INFORMATION                                                  */
+/* ========================================================================== */
+function pageModel(){
+  const steps = ["Patient Data","Validation","Preprocessing","XGBoost","Probabilities","Triage Prediction"];
+  const schemaNums = state.schema
+    ? `${state.schema.features.length} inputs · ${state.schema.numeric.length} numeric / ${state.schema.categorical.length} categorical`
+    : "Not available — start the backend to read /schema";
+
+  return `
+  <div class="space-y-6 fade">
+
+    <section class="card card-lg p-7">
+      <div class="flex flex-wrap items-center gap-3">
+        <h2 class="text-[21px] font-bold tracking-tight">XGBoost Multiclass Classifier</h2>
+        <span class="chip" style="background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)">multi:softprob</span>
+        ${statusPill()}
+      </div>
+      <p class="text-[13.5px] mt-3 max-w-[760px] leading-relaxed" style="color:var(--ink-2)">
+        Target <span class="mono">start_category</span>. The classifier emits a probability per triage category and the
+        predicted class is the highest-probability one. The deployed artifact is the notebook's final model, retrained on
+        all ${METRICS.trainN} training rows.
+      </p>
+      <div class="grid gap-4 grid-cols-2 lg:grid-cols-4 mt-6">
+        ${factCard("Training","664 patients")}
+        ${factCard("Input Features", String(METRICS.nFeatures), schemaNums)}
+        ${factCard("Classes","RED / YELLOW / GREEN / BLACK")}
+        ${factCard("Decision Rule","Argmax probability")}
+      </div>
+    </section>
+
+    <section class="card card-lg p-6 sm:p-7">
+      <h3 class="text-[15px] font-semibold tracking-tight mb-5">Inference Pipeline</h3>
+      <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
+        ${steps.map((s,i) => `
+          <div class="rounded-[10px] px-4 py-2.5 text-[12.5px] font-semibold text-center"
+               style="background:${i===3?"var(--navy)":"var(--surface-2)"};color:${i===3?"#fff":"var(--ink)"};
+                      border:1px solid ${i===3?"var(--navy)":"var(--line)"}">${s}</div>
+          ${i<steps.length-1 ? `<span class="self-center" style="color:var(--ink-3)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                 class="w-4 h-4 rotate-90 sm:rotate-0"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>` : ""}`).join("")}
+      </div>
+    </section>
+
+    <div class="grid gap-5 xl:grid-cols-2">
+      <section class="card card-lg p-6">
+        <h3 class="text-[15px] font-semibold tracking-tight mb-4">Parameters</h3>
+        <table class="dt"><tbody>
+          ${HYPERPARAMS.map(([k,v]) => `<tr>
+            <td class="mono" style="color:var(--ink-2)">${esc(k)}</td>
+            <td class="mono font-semibold text-right">${esc(v)}</td></tr>`).join("")}
+        </tbody></table>
+      </section>
+
+      <section class="card card-lg p-6">
+        <h3 class="text-[15px] font-semibold tracking-tight mb-4">Preprocessing</h3>
+        <div class="space-y-3">
+          ${[
+            ["Numerical","Median imputation (SimpleImputer)"],
+            ["Categorical","Most-frequent imputation, then one-hot encoding with handle_unknown=\"ignore\""],
+            ["subject_id","Excluded from model input; identification only"],
+            ["Leakage control","All steps wrapped in a ColumnTransformer inside a scikit-learn Pipeline"]
+          ].map(([k,v]) => `
+          <div class="rounded-[10px] p-3.5" style="background:var(--surface-2);border:1px solid var(--line-soft)">
+            <div class="eyebrow">${esc(k)}</div>
+            <div class="text-[12.5px] mt-1.5 leading-relaxed" style="color:var(--ink-2)">${esc(v)}</div>
+          </div>`).join("")}
+        </div>
+      </section>
+    </div>
+
+    <section class="card card-lg p-6">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h3 class="text-[15px] font-semibold tracking-tight">Model Inputs</h3>
+          <p class="text-[12px] mt-1" style="color:var(--ink-3)">Read live from <span class="mono">GET /schema</span> — the fitted pipeline is the source of truth.</p>
+        </div>
+        <span class="chip" style="background:var(--surface-2);color:var(--ink-2);border-color:var(--line)">${esc(schemaNums)}</span>
+      </div>
+      ${state.schema ? `
+        <div class="grid gap-5 lg:grid-cols-2">
+          <div>
+            <div class="eyebrow mb-2.5">Categorical (${state.schema.categorical.length})</div>
+            <div class="flex flex-wrap gap-1.5">
+              ${state.schema.categorical.map(f => `<span class="chip mono" style="background:var(--surface-2);color:var(--ink-2);border-color:var(--line)">${esc(f)}</span>`).join("")}
+            </div>
+          </div>
+          <div>
+            <div class="eyebrow mb-2.5">Numeric (${state.schema.numeric.length})</div>
+            <div class="flex flex-wrap gap-1.5">
+              ${state.schema.numeric.map(f => `<span class="chip mono" style="background:var(--surface-2);color:var(--ink-2);border-color:var(--line)">${esc(f)}</span>`).join("")}
+            </div>
+          </div>
+        </div>`
+      : `<p class="text-[13px]" style="color:var(--ink-3)">Not available — the schema endpoint could not be reached.</p>`}
+    </section>
+
+    <section class="card card-lg p-6">
+      <h3 class="text-[15px] font-semibold tracking-tight mb-2">API Contract</h3>
+      <pre class="mono text-[11.5px] rounded-[10px] p-4 overflow-x-auto leading-relaxed"
+           style="background:var(--surface-2);border:1px solid var(--line-soft);color:var(--ink-2)">GET  ${esc(TriageAPI.baseUrl)}/health
+GET  ${esc(TriageAPI.baseUrl)}/schema
+POST ${esc(TriageAPI.baseUrl)}/predict
+POST ${esc(TriageAPI.baseUrl)}/agent/analyze
+
+{ "prediction": "RED",
+  "probabilities": { "RED": 0, "YELLOW": 0, "GREEN": 0, "BLACK": 0 } }</pre>
+      <p class="text-[11.5px] mt-3" style="color:var(--ink-3)">
+        Every prediction shown in this interface comes from this endpoint. There is no client-side predictor.
+      </p>
+    </section>
+  </div>`;
+}
+
+/* ========================================================================== */
+/*  PAGE — ABOUT                                                              */
+/* ========================================================================== */
+function pageAbout(){
+  const blocks = [
+    ["Problem","In mass-casualty and high-volume emergency situations, staff must rapidly sort patients by treatment urgency. Manual triage under time pressure is error-prone, and classifying a critical patient as stable is far more harmful than over-triaging a stable one."],
+    ["Approach","Patient-level tabular data is passed through a single scikit-learn Pipeline: median imputation for numeric columns, most-frequent imputation plus one-hot encoding for categorical columns, all fitted inside a ColumnTransformer to avoid leakage."],
+    ["Model","Six model families were trained on identical preprocessing and compared on a stratified 80/20 hold-out split. XGBoost led on both accuracy and total cost and was retrained on all 664 training rows as the final model."],
+    ["Cost-aware evaluation","Models were scored against the official asymmetric misclassification cost matrix as well as accuracy and F1. An expected-cost decision rule was evaluated and rejected because it scored worse on validation than plain argmax."],
+    ["Decision support","This interface exposes the trained pipeline for patient-by-patient entry, showing the predicted category, the full probability distribution and the values that were submitted."]
+  ];
+  return `
+  <div class="space-y-5 fade max-w-[900px]">
+    <section class="card card-lg p-7">
+      <h2 class="text-[24px] font-bold tracking-tight">TriageAI</h2>
+      <p class="text-[14px] mt-2" style="color:var(--ink-2)">Machine-learning assisted emergency triage classification.</p>
+      <div class="flex flex-wrap gap-2 mt-5">
+        ${["Problem statement MM26ML03","Team MM2626","Modelling Minds 2.0 · ML Track"]
+          .map(t => `<span class="chip" style="background:var(--surface-2);color:var(--ink-2);border-color:var(--line)">${esc(t)}</span>`).join("")}
+      </div>
+    </section>
+
+    ${blocks.map(([h,b],i) => `
+    <section class="card card-lg p-6">
+      <div class="flex items-start gap-4">
+        <span class="mono text-[11px] font-semibold mt-0.5 flex-none" style="color:var(--accent)">0${i+1}</span>
+        <div>
+          <h3 class="text-[15px] font-semibold tracking-tight">${esc(h)}</h3>
+          <p class="text-[13px] mt-2 leading-relaxed" style="color:var(--ink-2)">${esc(b)}</p>
+        </div>
+      </div>
+    </section>`).join("")}
+
+    <section class="card card-lg p-6" style="background:var(--red-bg);border-color:var(--red-line)">
+      <div class="flex items-start gap-3.5">
+        <span class="flex-none mt-0.5" style="color:var(--red)">${icon("shield","w-[18px] h-[18px]")}</span>
+        <div>
+          <h3 class="text-[14px] font-semibold" style="color:var(--red)">Disclaimer</h3>
+          <p class="text-[13px] mt-1.5 leading-relaxed" style="color:var(--ink-2)">
+            TriageAI is a decision-support prototype for hackathon demonstration. It does not replace clinical judgment or professional medical care.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-lg p-6">
+      <h3 class="text-[15px] font-semibold tracking-tight mb-4">Stack</h3>
+      <div class="flex flex-wrap gap-1.5">
+        ${["Python 3.14","scikit-learn Pipeline","XGBoost","LightGBM","CatBoost","Optuna","FastAPI","Vanilla JS","Tailwind CSS"]
+          .map(t => `<span class="chip" style="background:var(--surface-2);color:var(--ink-2);border-color:var(--line)">${esc(t)}</span>`).join("")}
+      </div>
+    </section>
+  </div>`;
+}
+
+/* ========================================================================== */
+/*  ACTIONS                                                                   */
+/* ========================================================================== */
+function setField(name, value, recalcGcs){
+  state.form[name] = value;
+  if(state.errors[name]){ delete state.errors[name]; }
+  if(recalcGcs){
+    const parts = ["gcs_eye","gcs_verbal","gcs_motor"].map(k => Number(state.form[k]));
+    if(parts.every(v => Number.isFinite(v) && v > 0) &&
+       ["gcs_eye","gcs_verbal","gcs_motor"].every(k => state.form[k] !== "")){
+      state.form.gcs_total = String(parts[0] + parts[1] + parts[2]);
+      const el = document.getElementById("f_gcs_total");
+      if(el) el.value = state.form.gcs_total;
+    }
+  }
+}
+
+function toggleSection(num){
+  const s = SECTIONS.find(x => x.num === num);
+  const current = state.open[num] ?? !(s && s.collapsed);
+  state.open[num] = !current;
+  render();
+}
+
+function validate(){
+  const errs = {};
+  features().forEach(n => {
+    const v = state.form[n];
+    if(v === "" || v == null) return;
+    if(isCat(n)) return;
+    const num = Number(v);
+    const m = meta(n);
+    if(!Number.isFinite(num)) errs[n] = "Must be a number.";
+    else if(m.min != null && num < m.min) errs[n] = `Must be ≥ ${m.min}.`;
+    else if(m.max != null && num > m.max) errs[n] = `Must be ≤ ${m.max}.`;
+    else if(num < 0) errs[n] = "Cannot be negative.";
+  });
+  return errs;
+}
+
+function buildPayload(){
+  const payload = {};
+  features().forEach(n => {
+    const v = state.form[n];
+    if(v === "" || v == null) return;      // omitted -> imputed by the pipeline
+    payload[n] = isCat(n) ? String(v) : Number(v);
+  });
+  return payload;
+}
+
+async function assess(){
+  const errs = validate();
+  state.errors = errs;
+
+  if(Object.keys(errs).length){
+    render();
+    const first = document.querySelector(".inp.err");
+    if(first){
+      first.scrollIntoView({block:"center", behavior:"smooth"});
+      first.focus();
+    }
+    return;
+  }
+
+  const payload = buildPayload();
+
+  state.loading = true;
+  state.aiLoading = false;
+  state.aiExplanation = null;
+  state.aiError = null;
+  state.page = "results";
+  render();
+  window.scrollTo({top:0});
+
+  try{
+    // 1. REAL XGBoost prediction
+    const data = await window.TriageAPI.predict(payload);
+
+    if(!data || !data.prediction || !data.probabilities)
+      throw new Error("Malformed response from /predict.");
+
+    const sum = CLASSES.reduce(
+      (a,c) => a + Number(data.probabilities[c] || 0), 0
+    );
+
+    if(!(sum > 0.99 && sum < 1.01))
+      throw new Error(
+        "Probabilities sum to " + sum.toFixed(6) + ", not ~1."
+      );
+
+    const now = new Date();
+
+    state.submitted = payload;
+    state.result = {
+      prediction: data.prediction,
+      probabilities: data.probabilities,
+      id: "ASMT-" + now.getFullYear()
+          + String(now.getMonth()+1).padStart(2,"0")
+          + String(now.getDate()).padStart(2,"0") + "-"
+          + String(
+              Math.floor(
+                now.getHours()*3600 +
+                now.getMinutes()*60 +
+                now.getSeconds()
+              )
+            ).padStart(5,"0"),
+      ts: now.toLocaleString(
+        undefined,
+        {dateStyle:"medium", timeStyle:"short"}
+      )
+    };
+
+    // 2. Show the XGBoost result while Gemini generates the explanation.
+    state.loading = false;
+    state.aiLoading = true;
+    render();
+
+    try{
+      const agentResponse = await fetch(
+        `${window.TriageAPI.baseUrl}/agent/analyze`,
+        {
+          method:"POST",
+          headers:{
+            "Content-Type":"application/json"
+          },
+          body:JSON.stringify({
+            features:payload,
+            prediction:data.prediction,
+            probabilities:data.probabilities
+          })
+        }
+      );
+
+      if(!agentResponse.ok){
+        let message = `AI agent failed: HTTP ${agentResponse.status}`;
+
+        try{
+          const body = await agentResponse.json();
+          if(body && body.detail) message = String(body.detail);
+        }catch(_){}
+
+        throw new Error(message);
+      }
+
+      const agentData = await agentResponse.json();
+
+      if(!agentData || typeof agentData.explanation !== "string"){
+        throw new Error("AI agent returned an invalid explanation.");
+      }
+
+      state.aiExplanation = agentData.explanation;
+      state.aiError = null;
+
+    }catch(agentError){
+      console.error("TriageAI agent error:", agentError);
+      state.aiExplanation = null;
+      state.aiError = agentError.message;
+    }finally{
+      state.aiLoading = false;
+      render();
+      window.scrollTo({top:0});
+    }
+
+  }catch(err){
+    console.error(err);
+
+    state.result = null;
+    state.submitted = null;
+    state.aiExplanation = null;
+    state.aiLoading = false;
+    state.aiError = null;
+    state.page = "assessment";
+
+    alert(
+      "Prediction failed: " + err.message +
+      "\n\nCheck that the FastAPI backend is running on " +
+      TriageAPI.baseUrl + "."
+    );
+
+    state.loading = false;
+    render();
+  }
+}
+
+function clearForm(){
+  state.form = {};
+  state.errors = {};
+  state.result = null;
+  state.submitted = null;
+  state.aiExplanation = null;
+  state.aiLoading = false;
+  state.aiError = null;
+  render();
+}
+
+function go(page){
+  state.page = page;
+  closeDrawer();
+  render();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+function closeDrawer(){
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("scrim").classList.add("hidden");
+}
+
+/* ========================================================================== */
+/*  RENDER                                                                    */
+/* ========================================================================== */
+const VIEWS = {
+  dashboard: pageDashboard,
+  assessment: pageAssessment,
+  results: pageResults,
+  analytics: pageAnalytics,
+  model: pageModel,
+  about: pageAbout
+};
+
+function render(){
+  document.getElementById("nav").innerHTML = PAGES.map(p => `
+    <button class="nav-item ${state.page===p.id?"active":""}" onclick="go('${p.id}')">
+      ${icon(p.icon)}<span>${p.label}</span>
+    </button>`).join("");
+
+  const page = PAGES.find(p => p.id === state.page) || PAGES[0];
+  document.getElementById("pageTitle").textContent = page.label;
+  document.getElementById("pageSub").textContent = page.sub;
+
+  const live = state.api.live;
+  document.getElementById("headerStatus").innerHTML = `
+    ${statusPill()}
+    <span class="chip hidden sm:inline-flex" style="background:var(--surface-2);color:var(--ink-2);border-color:var(--line)">
+      ${live ? "API Connected" : "API Disconnected"}
+    </span>`;
+
+  document.getElementById("sidebarStatus").innerHTML = `
+    <div class="flex items-center gap-2">
+      <span class="dot ${live?"dot-live":"dot-off"}"></span>
+      <span class="text-[11.5px] font-bold tracking-wide" style="color:${live?"var(--green)":"var(--yellow)"}">
+        ${live ? "LIVE MODEL" : "API OFFLINE"}</span>
+    </div>
+    <div class="text-[11px] mt-1.5" style="color:var(--ink-3)">XGBoost Pipeline</div>
+    <div class="text-[10.5px] mt-1 mono break-all" style="color:var(--ink-3)">${esc(state.api.detail)}</div>`;
+
+  document.getElementById("view").innerHTML = VIEWS[state.page]();
+}
+
+/* ---- API status wiring (triage-live.js owns the network) ----------------- */
+function applyStatus(detail){
+  state.api.live = !!(detail && detail.live);
+  state.api.checked = true;
+  state.api.detail = (detail && detail.detail) || (state.api.live ? "Connected" : "Not reachable");
+  if(detail && detail.schema) state.schema = detail.schema;
+  render();
+}
+document.addEventListener("triage-status", e => applyStatus(e.detail));
+document.addEventListener("triage-schema-loaded", e => { state.schema = e.detail; render(); });
+
+/* ---- drawer -------------------------------------------------------------- */
+document.getElementById("menuBtn").onclick = () => {
+  document.getElementById("sidebar").classList.toggle("open");
+  document.getElementById("scrim").classList.toggle("hidden");
+};
+document.getElementById("scrim").onclick = closeDrawer;
+document.addEventListener("keydown", e => { if(e.key === "Escape") closeDrawer(); });
+
+/* ---- boot ---------------------------------------------------------------- */
+render();
+if(window.TriageAPI && typeof window.TriageAPI.connect === "function"){
+  window.TriageAPI.connect().then(applyStatus);
+}
+</script>
+</body>
+</html>
